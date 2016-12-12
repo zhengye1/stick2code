@@ -1,24 +1,30 @@
 package com.gt.stick2code.pinblockencryption;
 
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-public class PinBlockEncryptionUtil {
 
+public class PinBlockEncryptionUtil {
 	
+	static IvParameterSpec IV = new IvParameterSpec(new byte[8]);
 	public static void main(String[] args) throws InvalidKeyException,
 			NoSuchAlgorithmException, NoSuchPaddingException,
-			IllegalBlockSizeException, BadPaddingException {
+			IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
 		String key = "1234567890123456123456789012345612345678901234FF";
-		System.out
-				.println(encryptPinBlock("1234567890123456", "1234", key, 168));
+		String encrypt = encryptPinBlock("3219876543210987", "1234", key, 168);
+
+		System.out.println(getHexString(getPinBlock("3219876543210987", "1234")));
+		System.out.println(encrypt);
+		String decrypt = decryptPinBlock(encrypt, key, 168);
+		System.out.println(decrypt);
 
 	}
 
@@ -27,30 +33,56 @@ public class PinBlockEncryptionUtil {
 	 * @param cardNumber Card number for which the Pin is encrypted
 	 * @param pin Pin to be encrypted
 	 * @param key Clear Key to be used for encryption
-	 * @param keySize Key strnght
+	 * @param keySize Key strength
 	 * @return The Hex representation of the encrypted pin block bytes
 	 * @throws NoSuchAlgorithmException
 	 * @throws NoSuchPaddingException
 	 * @throws InvalidKeyException
 	 * @throws IllegalBlockSizeException
 	 * @throws BadPaddingException
+	 * @throws InvalidAlgorithmParameterException 
 	 */
 	public static String encryptPinBlock(String cardNumber, String pin,
 			String key, int keySize) throws NoSuchAlgorithmException,
 			NoSuchPaddingException, InvalidKeyException,
-			IllegalBlockSizeException, BadPaddingException {
+			IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
 		byte[] keyBytes = getEncryptionKey(key, keySize);
 		byte[] pinBlock = getPinBlock(cardNumber, pin);
 		SecretKey secretKey = new SecretKeySpec(keyBytes, "DESede");
 
 		Cipher cipher = Cipher.getInstance("DESede/CBC/NoPadding");
-		cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+		cipher.init(Cipher.ENCRYPT_MODE, secretKey, IV);
 		byte[] encryptedPinBlock = cipher.doFinal(pinBlock);
 
 		return getHexString(encryptedPinBlock);
 
 	}
 
+	/**
+	 * Decrypt the encrypted pin block
+	 * @param hex cipher pin block
+	 * @param key Clear Key to be used for encryption
+	 * @param keySize Key strength
+	 * @return The Hex representation of decrypted PIN Block
+	 * @throws NoSuchAlgorithmException
+	 * @throws NoSuchPaddingException
+	 * @throws InvalidKeyException
+	 * @throws IllegalBlockSizeException
+	 * @throws BadPaddingException
+	 * @throws InvalidAlgorithmParameterException
+	 */
+	public static String decryptPinBlock(String hex, String key, int keySize) 
+			throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException,
+			IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException{
+		byte [] keyBytes = getEncryptionKey(key, keySize);
+		byte [] cipherText = getHexByteArray(hex);
+		SecretKey secretKey = new SecretKeySpec(keyBytes, "DESede");
+
+		Cipher cipher = Cipher.getInstance("DESede/CBC/NoPadding");
+		cipher.init(Cipher.DECRYPT_MODE, secretKey, IV);
+		byte[] decryptPinBlock = cipher.doFinal(cipherText);
+		return getHexString(decryptPinBlock);
+	}
 	/**
 	 * Takes the Card number and Pin as input and generates the Pin Block Out of it.
 	 * First get the card padded (16 Char) which when converted to Hex gives an array of 8
@@ -80,7 +112,7 @@ public class PinBlockEncryptionUtil {
 	 * Two digit pin length (left padded with zero if length less than 10)
 	 * Pin Number 
 	 * Right padded with F to make it 16 char long.
-	 * FOr example for a 5 digit Pin 12345 the outout would be 
+	 * FOr example for a 5 digit Pin 12345 the output would be 
 	 * 0512 345F FFFF FFFF
 	 * @param pin
 	 * @return
